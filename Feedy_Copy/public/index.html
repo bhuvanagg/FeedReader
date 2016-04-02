@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html>
+<head>
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title> RSS Feed Reader - Feedy</title>
+  <link href="./ply.css" rel="stylesheet" type="text/css"/>
+  <link rel="stylesheet" type="text/css" href="offline-master/themes/offline-theme-chrome.css"/>
+  <link rel="stylesheet" href="jquery.reject.css">
+  <link href="offline-master/themes/offline-language-english.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript" src="http://jquery.thewikies.com/browser/jquery.browser.min.js"></script>
+  <script src="Ply.js"> </script>    
+  <script src='script.js'> </script>
+  <script src="uaSpoofing.js"></script>
+  <script src='jquery-2.2.1.min.js'> </script>
+ <script src="jquery.reject.js"> </script>
+  <script src='moment.js'> </script>
+    <script src="md5.js"></script>
+  <script src="offline.min.js"></script>
+  <script src="offline-master/js/offline.js"></script>
+  <script>
+
+var user = null;
+var allSubs = null;
+var postObjList = null;
+var debug = null;
+var logdetail = null;
+var AI = {
+    show: function(){
+        var mu = "<div class='fadeBox'>" + "<div class='acInd'>" + "</div>" + "</div>";
+        document.body.innerHTML += mu;
+    },
+    hide: function()
+    {
+    $(".acInd").remove();
+}
+}
+
+var run = function(){
+  var req = new XMLHttpRequest();
+  req.timeout = 5000;
+  req.open('GET', 'http://localhost:8080', true);
+  req.send();
+}
+setInterval(run, 3000);
+
+
+
+   
+ var showLogin = function() {
+            Ply.dialog("prompt", {
+                title: "Login",
+                form: {
+                    email: "Email",
+                    password: {hint: "Password", type: "password"}
+                }
+            })
+            .then((ui) => {
+                var data = ui.data;
+                        
+                //Get email and password
+                var tempUser = data.email;
+                var password = data.password;
+                var hashdp = hex_md5(password);
+                
+                
+                if (tempUser.length > 0 && password.length > 0) {
+                    var url = "./login?user=" + tempUser + "&password=" + hashdp;
+                    
+                    loadURL(url, function(data) {
+                        var res = data;
+                        
+                        if (res == "1") {
+                            user = tempUser;
+                            login();
+                        }
+                        else {
+                            Ply.dialog("alert", "Invalid email or password")
+                            .then((ui) => {
+                                showLogin();
+                            })
+                            .catch((ui) => {
+                                //Pressed cancel
+                            });
+                        }
+                    });
+                }
+            })
+            .catch((ui) => {
+                //Pressed cancel
+            });
+        }
+    
+        var showSignUp = function() {
+            Ply.dialog("prompt", {
+                title: "Sign Up",
+                form: {
+                    email: "Email",
+                    password: {hint: "Password", type: "password"}
+                }
+            })
+            .then((ui) => {
+                var data = ui.data;
+                    
+                //Get email and password
+                var tempUser = data.email;
+                var password = data.password;
+                var hashdp = hex_md5(password);
+                
+                if (tempUser.length > 0 && password.length > 0) {
+                    var url = "./createUser?user=" + tempUser + "&password=" + hashdp;
+                    
+                    loadURL(url, function(data) {
+                        var res = data;
+                        
+                        if (res == "1") {
+                            user = tempUser;
+                            login();
+                        }
+                        else {
+                            Ply.dialog("alert", "Email already in use")
+                            .then((ui) => {
+                                showSignUp();
+                            })
+                            .catch((ui) => {
+                                //Pressed cancel
+                            });
+                        }
+                    });
+                }
+            })
+            .catch((ui) => {
+                //Pressed cancel
+            });
+        }
+    
+        var login = function() {
+            if (user != null) {
+                //Display user in top right corner
+                document.getElementById("username").innerHTML = user;
+                
+                //Change login button to logout
+                document.getElementById("loginButton").innerHTML = "Logout";
+                document.getElementById("loginButton").href = "javascript:logout()";
+                
+                //Hide sign up button
+                document.getElementById("signUpButton").style.visibility = "hidden";
+                
+                //Show add button and feed list
+                document.getElementById("addbtn").style.visibility = "visible";
+                
+                loadMySubs(0); //open first feed after loading
+            }
+        }
+    
+        var logout = function() {
+            //Clear out user
+            user = null;
+            document.getElementById("username").innerHTML = "";
+            
+            //Change logout button to login
+            document.getElementById("loginButton").innerHTML = "Login";
+            document.getElementById("loginButton").href = "javascript:showLogin()";
+            
+            //Show sign up button
+            document.getElementById("signUpButton").style.visibility = "visible";
+            
+            //Hide add button and feed list
+            document.getElementById("addbtn").style.visibility = "hidden";
+            document.getElementById("myFeedList").innerHTML = "Login or sign up to view your feeds!";
+            
+         //   loadMySubs(-1); //no feeds to open
+        }
+//
+var aSubSelected = function(index){
+  var list = document.getElementById("myFeedList").getElementsByClassName("listItem")
+  for(var i = 0; i < list.length; i++){
+    if(i == index){
+      list[i].style.color = "red";
+      list[i].style.backgroundColor= "white";
+        list[i].style.opacity = 1.25;
+    }
+    else{
+      list[i].style.color = "";
+      list[i].style.backgroundColor= "";
+      list[i].style.opacity = 0.5;
+    }
+  }
+  var link = allSubs[index].link;
+  var url = "./getAllPosts?link=" + link;
+  loadURL(url, function(data){
+    var title = JSON.parse(data).feed.title.label;
+    postObjList = JSON.parse(data).feed.entry;
+    var markUp = "<h4>" + title + "</h4>";
+    for (var i = 0; i < postObjList.length; i++){
+        var aPost = postObjList[i];
+        markUp += "<a href='javascript:aPostSelected(" + i + ")' class='listItem'>" + aPost.title.label +" </a>";
+    }
+    document.getElementById("currFeedWrapper").innerHTML = 
+     "<a href='javascript:backToMyFeeds()' class='backButton'><img src='back-btn.svg'> </a>" + markUp;
+      if(ENV.screen.small){
+        $("#myFeedWrapper, #selFeedWrapper").fadeOut();
+        $("#currFeedWrapper").fadeIn();
+      }
+  });
+}
+function backToMyFeeds(){
+      if(ENV.screen.small){
+        $("#currFeedWrapper, #selFeedWrapper").fadeOut();
+        $("#myFeedWrapper").fadeIn();
+      }
+}
+
+function backToCurrFeeds()
+{
+      if(ENV.screen.small){
+        $("#myFeedWrapper, #selFeedWrapper").fadeOut();
+        $("#currFeedWrapper").fadeIn();
+      }
+}
+
+var aPostSelected = function(index){
+  var list = document.getElementById("currFeedWrapper").getElementsByClassName("listItem");
+  for(var i = 0; i < list.length; i++){
+    if(i == index){
+      list[i].style.color = "red";
+      list[i].style.backgroundColor= "white";
+      list[i].style.opacity = 1.25;
+    }
+    else{
+      list[i].style.color = "";
+      list[i].style.backgroundColor= "";
+      list[i].style.opacity = 0.5;
+    }
+  }
+  var postObj = postObjList[index]
+  var markUp = "";
+  markUp += "<h1 id='postheading'>" + postObj.title.label + "</h1>";
+  markUp += "<h2 id='postartist'>" + postObj["im:artist"].label + "</h1>";
+  markUp += "<img id='postimg' src='" + postObj["im:image"][2].label + "'>"
+  var price = postObj["im:price"].label;
+  if(price.toLowerCase() === "get") price = "$0.00";
+  markUp += "<br><p id='postprice'>" + price  + "</p>";
+  markUp += "<h5> Release Date :   " + postObj["im:releaseDate"]["attributes"].label + "</h5>";
+  if(postObj.hasOwnProperty('summary'))
+  {
+  markUp += "<h4 id='headsummary'> Summary </h4>";
+  markUp += "<p id='parasummary'>" + postObj.summary.label + "</p>";
+  }
+
+  document.getElementById("selFeedWrapper").innerHTML =
+   "<a href='javascript:backToCurrFeeds()' class='backButton'><img src='back-btn.svg'> </a>"+  markUp;
+      if(ENV.screen.small){
+        $("#myFeedWrapper, #currFeedWrapper").fadeOut();
+        $("#selFeedWrapper").fadeIn();
+      }
+}
+
+
+var startUp = function(){
+    spoofUserAgent();
+    loadMySubs();
+ showLogin();    
+    var currtime = moment().format('MMMM Do YYYY, h:mm:ss a'); 
+    document.getElementById("time").innerHTML = currtime;
+  
+          $(document).ready(function(){
+              
+                  
+       $(function() {
+		$.reject();
+	   });
+        $('#currFeedWrapper').hide();
+        $('#selFeedWrapper').hide();
+        $('#myFeedWrapper').on('dblclick',function(){
+             $('#currFeedWrapper').show();
+        });
+        $('#currFeedWrapper').on('click',function(){
+             $('#selFeedWrapper').show();
+        });
+          });
+}
+
+var addFeed = function()
+{
+  var link = prompt("Add New Feed URL (json)");
+  if(link == null) return;
+  var url = "./addOrEditSub?user=" + user;
+  url += "&link=" + encodeURIComponent(link);
+  url += "&date=" + new Date().getTime();
+  url += "&id=" + user + new Date().getTime();
+  loadURL(url, function(data){
+    loadMySubs();
+  });
+}
+
+var loadMySubs = function()
+{
+  var url = "./listSubs?user=" + user;
+  loadURL(url, function(data){ 
+    var mySubs = JSON.parse(data);
+    allSubs = mySubs;
+    if((mySubs.length == 0)){
+      document.getElementById("myFeedList").innerHTML = "<h4 id='nosub'>No subsciptions </h4>" 
+    }
+    else{
+      var markUp = "";
+      markUp += "<h2 id='subfeed'> Subscribed Feeds </h2><br/>";
+      for (var i = 0; i < mySubs.length; i++){
+        var aFeed = mySubs[i];
+        markUp += "<a href='javascript:aSubSelected(" + i + ")' class='listItem'>" + aFeed.id + " : " + aFeed.link +" </a>";
+      }
+      document.getElementById("myFeedList").innerHTML = markUp;
+        if(ENV.screen.small){
+        $("#currFeedWrapper, #selFeedWrapper").fadeOut();
+        $("#myFeedWrapper").fadeIn();
+      }
+    }
+  });
+
+}
+  </script>
+  <style>
+      
+@keyframes curry
+      {
+          0%  {background-color: #56CFC6; }
+          25%  {background-color: #56CFC6; }
+          100% { background-color: #F5CC78; }
+      }
+@keyframes sely
+      {
+           0%  {background-color: #F5CC78; }
+          25%  {background-color: #F5CC78; }
+          100% { background-color: #F08592; }
+      }
+  p{
+      text-align: center;
+  }
+  body{
+    margin: 0px;
+  }
+  #myFeedWrapper{
+    display: inline-block;
+        margin-top: 25px;
+    width: 30%;
+    vertical-align: top;
+    background-color: #70F0FF;
+    padding-bottom: 50px;
+   min-height: 20em;
+  }
+  .bigScreen #myFeedWrapper, .bigScreen #currFeedWrapper{
+    width: 25%;
+  }
+
+  .smallScreen #myFeedWrapper, .smallScreen #currFeedWrapper{
+    width: 100%;
+    position: absolute;
+  }
+  .smallScreen #selFeedWrapper{
+    width: 100%;
+    position: absolute;
+  }
+      
+#currFeedWrapper
+      {
+          position: absolute;
+          display: inline-block;
+          width: 25%;
+          vertical-align: top;
+          padding-bottom: 20px;
+          margin-top: 25px;
+          animation: curry;
+          animation-duration: 2s;
+          animation-timing-function:linear;
+          background-color: #F5CC78;
+      }
+  #selFeedWrapper{
+    display: inline-block;
+    width: 40%;
+      margin-top: 25px;
+    background-color: #F08592;
+    vertical-align: top;
+    min-height: 100%;
+      animation: sely;
+      animation-duration: 2s;
+     animation-timing-function: linear;
+      
+  }
+      
+#subfeed
+      {
+          text-align: center;
+          font-size: 150%;
+          color: black;
+      }
+  #myFeedList{
+    margin-top: 30px;
+      line-height: 2;
+  }
+  .listItem{
+    display: block;
+    padding: 5px;
+      margin: 10px;
+    white-space: word-wrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+      border: 2px solid white;
+     border-radius: 15px;
+  }
+.smallScreen #nosub
+      {
+          text-align: center;
+      }
+.smallScreen #curtime
+      {
+          display: none;
+      }
+body
+      {
+          background-color: black;
+      }
+h1
+      {
+          text-align: center;
+          margin-right: 20px;
+          font-size: 300%;
+          color: white;
+      }
+.smallScreen h1
+      {
+          text-align: left;
+          margin-left: 20px;
+          font-size: 300%;
+          color: white;
+      }
+#curtime
+      {
+          text-align: right;
+          font-size: 100%;
+          margin-top: -40px;
+          margin-right: 20px;
+          color: red;
+      }
+h3
+      {
+          text-align: center;
+          font-size: 150%;
+      }
+#addbtn
+      {
+          text-decoration: none;
+          padding: 5px;
+          background-color: whitesmoke; 
+          color: blue; 
+          border-radius: 5px; 
+          border: 1px solid black;
+          margin:30px; 
+          margin-top: 100px;
+          box-shadow: 0px 0px 2px;
+          margin-left: 150px;
+      }
+h4
+      {
+          text-align: center;
+          font-weight: 600;
+          font-style: italic;
+          font-size: 125%;
+      }
+#postheading
+      {
+       font-size: 150%;
+       font-weight: bold;
+          text-align: center;
+      }
+#postartist
+      {
+          font-size: 100%;
+          text-align: center;
+          text-decoration: underline;
+      }
+#postimg
+      {
+         margin-left: 40%;
+          margin-top: 30px;
+          min-height: 100px;
+          min-width: 100px;
+      }
+#postprice
+      {
+          font-size: 125%;
+          margin-top: 25px;
+          padding-top: 30px;
+      }
+#parasummary
+      {
+          text-align: left;
+          margin: 10px;
+      }
+h5
+      {
+          text-align: left;
+          color: papayawhip;
+          margin-left: 20px;
+      }
+.slbutton
+      {
+          background-color: #2E7F32;
+          padding: 10px;
+          border-radius: 15px;
+          text-decoration: none;
+          color: white;
+      }
+#loginButton
+      {
+          background-color: #74297F;
+          position: absolute;
+          top:15px;
+          right: 20px;      
+      }
+#signUpButton
+      {
+          position: absolute;
+          top:15px;
+          right: 90px;      
+      }
+.backButton
+      {
+          text-decoration: none;
+          padding:10px;
+      }
+  </style>
+</head>
+
+<body onload='startUp()'> 
+    <h1> Feedy </h1>
+     <h2 id="curtime"> Last access time : <span id="time"> </span></h2>
+        <a href="javascript:showSignUp()" class="slbutton" id="signUpButton">Sign Up</a>
+        <a id="loginButton" href="javascript:showLogin()" class="slbutton">Login</a>
+        <div id="username"></div>
+    </div>
+  <div id='myFeedWrapper'>
+  <!--  <h3> Subscribed Feeds </h3> -->
+    
+    <div id="myFeedList"></div>
+    <a href='javascript:addFeed()' id='addbtn'> Add New </a>      
+  </div>
+  <div id='currFeedWrapper'>
+    <h1> </h1>
+    <div id='currFeedList'> </div>
+ </div>
+  <div id='selFeedWrapper'> 
+    <h1> </h1>
+    <div id='feedDetails'> </div>
+  </div>
+</body>
+</html>
