@@ -173,7 +173,8 @@ setInterval(run, 3000);
         }
 //
 var aSubSelected = function(index){
-  var list = document.getElementById("myFeedList").getElementsByClassName("listItem")
+    AI.show();
+  var list = document.getElementById("myFeedList").getElementsByClassName("listItem");
   for(var i = 0; i < list.length; i++){
     if(i == index){
       list[i].style.color = "red";
@@ -196,12 +197,18 @@ var aSubSelected = function(index){
         var aPost = postObjList[i];
         markUp += "<a href='javascript:aPostSelected(" + i + ")' class='listItem'>" + aPost.title.label +" </a>";
     }
-    document.getElementById("currFeedWrapper").innerHTML = 
-     "<a href='javascript:backToMyFeeds()' class='backButton'><img src='back-btn.svg'> </a>" + markUp;
-      if(ENV.screen.small){
+          if(ENV.screen.small){
+            document.getElementById("currFeedWrapper").innerHTML = 
+                        "<a href='javascript:backToMyFeeds()' class='backButton'><img src='back-btn.svg'> </a>" + markUp;
         $("#myFeedWrapper, #selFeedWrapper").fadeOut();
         $("#currFeedWrapper").fadeIn();
       }
+      else
+      {
+          document.getElementById("currFeedWrapper").innerHTML += markUp;
+        $("#currFeedWrapper").show();
+      }
+      AI.hide();
   });
 }
 function backToMyFeeds(){
@@ -248,19 +255,20 @@ var aPostSelected = function(index){
   markUp += "<p id='parasummary'>" + postObj.summary.label + "</p>";
   }
 
-  document.getElementById("selFeedWrapper").innerHTML =
-   "<a href='javascript:backToCurrFeeds()' class='backButton'><img src='back-btn.svg'> </a>"+  markUp;
+    document.getElementById("selFeedWrapper").innerHTML = "<a href='javascript:backToCurrFeeds()'><img src='back-btn.svg' class='backButton'> </a>" + markUp;
+    $("#selFeedWrapper").show();
       if(ENV.screen.small){
+  
         $("#myFeedWrapper, #currFeedWrapper").fadeOut();
         $("#selFeedWrapper").fadeIn();
       }
-}
+}   
 
 
 var startUp = function(){
     spoofUserAgent();
     loadMySubs();
- showLogin();    
+    showLogin();    
     var currtime = moment().format('MMMM Do YYYY, h:mm:ss a'); 
     document.getElementById("time").innerHTML = currtime;
   
@@ -374,6 +382,11 @@ var loadMySubs = function()
           animation-duration: 2s;
           animation-timing-function:linear;
           background-color: #F5CC78;
+      }
+      
+.bigScreen #currFeedWrapper
+      {
+       position: relative;   
       }
   #selFeedWrapper{
     display: inline-block;
@@ -524,10 +537,14 @@ h5
           top:15px;
           right: 90px;      
       }
-.backButton
+.bigScreen .backButton
       {
-          text-decoration: none;
-          padding:10px;
+          display: none;
+      }
+.smallScreen .backButton
+      {
+          min-height:50px;
+          min-width: 50px;
       }
   </style>
 </head>
